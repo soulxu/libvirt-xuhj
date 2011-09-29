@@ -3192,6 +3192,51 @@ cmdReboot(vshControl *ctl, const vshCmd *cmd)
 }
 
 /*
+ * "reset" command
+ */
+static const vshCmdInfo info_reset[] = {
+    {"help", N_("reset a domain immediately without any guest OS shutdown")},
+    {"desc",
+     N_("Reset the target domain immediately without any guest OS shutdown. "
+        "That emulates the power reset of a button on a machine, i.e. "
+        "All hardware see the RST line set and reinitialize their "
+        "internal state.\n"
+        "\n"
+        "    Note that the risk of data loss caused by reset without "
+        "guest os shutdown.")},
+    {NULL, NULL}
+};
+
+static const vshCmdOptDef opts_reset[] = {
+    {"domain", VSH_OT_DATA, VSH_OFLAG_REQ, N_("domain name, id or uuid")},
+    {NULL, 0, 0, NULL}
+};
+
+static bool
+cmdReset(vshControl *ctl, const vshCmd *cmd)
+{
+    virDomainPtr dom;
+    bool ret = true;
+    const char *name;
+
+    if (!vshConnectionUsability(ctl, ctl->conn))
+        return false;
+
+    if (!(dom = vshCommandOptDomain(ctl, cmd, &name)))
+        return false;
+
+    if (virDomainReset(dom, 0) == 0) {
+        vshPrint(ctl, _("Domain %s is being reseted\n"), name);
+    } else {
+        vshError(ctl, _("Failed to reset domain %s"), name);
+        ret = false;
+    }
+
+    virDomainFree(dom);
+    return ret;
+}
+
+/*
  * "destroy" command
  */
 static const vshCmdInfo info_destroy[] = {
@@ -13665,6 +13710,7 @@ static const vshCmdDef domManagementCmds[] = {
     {"migrate-getspeed", cmdMigrateGetMaxSpeed,
      opts_migrate_getspeed, info_migrate_getspeed, 0},
     {"reboot", cmdReboot, opts_reboot, info_reboot, 0},
+    {"reset", cmdReset, opts_reset, info_reset, 0},
     {"restore", cmdRestore, opts_restore, info_restore, 0},
     {"resume", cmdResume, opts_resume, info_resume, 0},
     {"save", cmdSave, opts_save, info_save, 0},
