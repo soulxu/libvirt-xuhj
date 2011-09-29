@@ -492,6 +492,7 @@ LIBVIRT_0.9.5 {
 LIBVIRT_0.9.7 {
     global:
         virDomainSnapshotGetParent;
+        virDomainReset;
 } LIBVIRT_0.9.5;
 
 # .... define new API here using predicted next version number ....
