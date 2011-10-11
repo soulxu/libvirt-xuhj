@@ -146,6 +146,7 @@ static virNetClientPtr virNetClientNew(virNetSocketPtr sock,
         !(client->hostname = strdup(hostname)))
         goto no_memory;
 
+    //:notes 建立callback回调，将fd加入到eventloop的阻塞队列中去了。
     /* Set up a callback to listen on the socket data */
     client->refs++;
     if (virNetSocketAddIOCallback(client->sock,

@@ -85,6 +85,7 @@ struct private_data {
     int localUses;              /* Ref count for private data */
     char *hostname;             /* Original hostname */
 
+    //:notes 每个driver有一个该结构，用来保存Domain的callback，和维护注册到event loop的信息
     virDomainEventStatePtr domainEventState;
 };
 
@@ -568,6 +569,7 @@ doRemoteOpen (virConnectPtr conn,
             VIR_DEBUG("Proceeding with sockname %s", sockname);
         }
 
+        //:notes 这里就新建了一个unix socket，并加入到eventloop的poll队列中了。
         if (!(priv->client = virNetClientNewUNIX(sockname,
                                                  flags & VIR_DRV_OPEN_REMOTE_AUTOSTART,
                                                  remoteFindDaemonPath())))
@@ -627,6 +629,11 @@ doRemoteOpen (virConnectPtr conn,
 #endif /* WIN32 */
     } /* switch (transport) */
 
+    /*:notes
+     *   与libvirtd的server端一样，注册rpc来的消息去调用哪个proc，在libvirtd的server
+     *   端会去设置自动生成的api对应的remote proc，而client这里只需要domainevent的proc，
+     *   去触发client这边的domain event的callback.
+     */
     if (!(priv->remoteProgram = virNetClientProgramNew(REMOTE_PROGRAM,
                                                        REMOTE_PROTOCOL_VERSION,
                                                        remoteDomainEvents,
@@ -3009,9 +3016,11 @@ static int remoteDomainEventRegister(virConnectPtr conn,
          goto done;
     }
 
+    //:notes 这里只确保有一个VIR_DOMAIN_EVENT_ID_LIFECYCLE注册到libvirtd端即可
     if (virDomainEventCallbackListCountID(conn,
                                           priv->domainEventState->callbacks,
                                           VIR_DOMAIN_EVENT_ID_LIFECYCLE) == 1) {
+        //:notes 调用daemon/remote_dispatch中的REMOTE_PROC
         /* Tell the server when we are the first callback deregistering */
         if (call (conn, priv, 0, REMOTE_PROC_DOMAIN_EVENTS_REGISTER,
                 (xdrproc_t) xdr_void, (char *) NULL,
@@ -3097,6 +3106,10 @@ remoteDomainBuildEventReboot(virNetClientProgramPtr prog ATTRIBUTE_UNUSED,
     event = virDomainEventRebootNewFromDom(dom);
     virDomainFree(dom);
 
+    /*:notes
+     * 将domain event组装成event，并放入event queue中，还设置timeout为0，则立刻触发了，
+     * 在driver中domaineventstate中的callback。
+     */
     remoteDomainEventQueue(priv, event);
 }
 
@@ -3617,6 +3630,7 @@ static int remoteDomainEventRegisterAny(virConnectPtr conn,
          goto done;
     }
 
+    //:notes 将callback加入到本地remote driver中
     if ((callbackID = virDomainEventCallbackListAddID(conn,
                                                       priv->domainEventState->callbacks,
                                                       dom, eventID,
@@ -3632,6 +3646,7 @@ static int remoteDomainEventRegisterAny(virConnectPtr conn,
                                           eventID) == 1) {
         args.eventID = eventID;
 
+        //:notes 调用远端的domainRegisterAny，远端会注册对应的中转callback
         if (call (conn, priv, 0, REMOTE_PROC_DOMAIN_EVENTS_REGISTER_ANY,
                   (xdrproc_t) xdr_remote_domain_events_register_any_args, (char *) &args,
                   (xdrproc_t) xdr_void, (char *)NULL) == -1) {

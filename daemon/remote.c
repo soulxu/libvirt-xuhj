@@ -2755,6 +2755,7 @@ remoteDispatchDomainEventsRegisterAny(virNetServerPtr server ATTRIBUTE_UNUSED,
         goto cleanup;
     }
 
+    //:notes 在libvirtd端注册中转callback，中转callback负责发送rpc到client。client端会去调用真正的callback
     if ((callbackID = virConnectDomainEventRegisterAny(priv->conn,
                                                        NULL,
                                                        args->eventID,
